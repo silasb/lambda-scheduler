@@ -41,7 +41,7 @@ func (cli *Cli) Save() {
 // StartGoBin will try to start a go binary process.
 // Returns a fatal error in case there's any.
 func (cli *Cli) StartGoBin(sourcePath string, name string, keepAlive bool, args []string, envs []string, binFile bool) {
-	err := cli.remoteClient.StartGoBin(sourcePath, name, keepAlive, args, binFile)
+	err := cli.remoteClient.StartGoBin(sourcePath, name, keepAlive, args, envs, binFile)
 	if err != nil {
 		log.Fatalf("Failed to start go bin due to: %+v\n", err)
 	}

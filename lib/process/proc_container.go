@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/struCoder/pmgo/lib/utils"
 )
 
@@ -69,7 +70,8 @@ func (proc *Proc) Start() error {
 	//wd, _ := os.Getwd()
 	//envs := os.Environ()
 	envs := proc.Envs
-	fmt.Println(envs)
+
+	fmt.Printf("%+v\n", proc)
 
 	wd := proc.WorkingDir
 	procAtr := &os.ProcAttr{
@@ -84,12 +86,14 @@ func (proc *Proc) Start() error {
 	args := append([]string{proc.Name}, proc.Args...)
 	process, err := os.StartProcess(proc.Cmd, args, procAtr)
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	proc.process = process
 	proc.Pid = proc.process.Pid
 	err = utils.WriteFile(proc.Pidfile, []byte(strconv.Itoa(proc.process.Pid)))
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 	proc.Status.InitUptime()

@@ -28,9 +28,13 @@
 </div>
 
 
-# PMGO 
+# PMGO (lambda-scheduler)
 
 This is used as a POC for scheduling lambda functions to run.
+
+PMGO is a lightweight process manager written in Golang for Golang applications. It helps you keep your applications alive forever, reload and start them from the source code.
+
+## Change log (2020-5-20)
 
 Changes:
 
@@ -39,9 +43,11 @@ Changes:
 * Setting ENVs
 * ....
 
-PMGO is a lightweight process manager written in Golang for Golang applications. It helps you keep your applications alive forever, reload and start them from the source code.
+Starting jobs with
 
-
+```
+./pmgo start ../deno-aws-lambda-example/bootstrap deno3 true --envs LAMBDA_TASK_ROOT=$PWD/../deno-aws-lambda-example/ --envs _HANDLER=function.handler --envs AWS_LAMBDA_RUNTIME_API=127.0.0.1:8081 --envs PATH=/home/silas/.deno/bin:/usr/bin
+```
 
 ## Change log(2019-12-12 updated)
 
