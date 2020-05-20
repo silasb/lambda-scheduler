@@ -2,6 +2,7 @@ package process
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"syscall"
@@ -38,17 +39,19 @@ type ProcContainer interface {
 // Proc is a os.Process wrapper with Status and more info that will be used on Master to maintain
 // the process health.
 type Proc struct {
-	Name      string
-	Cmd       string
-	Args      []string
-	Path      string
-	Pidfile   string
-	Outfile   string
-	Errfile   string
-	KeepAlive bool
-	Pid       int
-	Status    *ProcStatus
-	process   *os.Process
+	Name       string
+	Cmd        string
+	Args       []string
+	Envs       []string
+	WorkingDir string
+	Path       string
+	Pidfile    string
+	Outfile    string
+	Errfile    string
+	KeepAlive  bool
+	Pid        int
+	Status     *ProcStatus
+	process    *os.Process
 }
 
 // Start will execute the command Cmd that should run the process. It will also create an out, err and pidfile
@@ -63,10 +66,15 @@ func (proc *Proc) Start() error {
 	if err != nil {
 		return err
 	}
-	wd, _ := os.Getwd()
+	//wd, _ := os.Getwd()
+	//envs := os.Environ()
+	envs := proc.Envs
+	fmt.Println(envs)
+
+	wd := proc.WorkingDir
 	procAtr := &os.ProcAttr{
 		Dir: wd,
-		Env: os.Environ(),
+		Env: envs,
 		Files: []*os.File{
 			os.Stdin,
 			outFile,
@@ -207,9 +215,9 @@ func (proc *Proc) GetStatus() *ProcStatus {
 	} else {
 		// update uptime
 		proc.SetUptime()
+		// update cpu and memory
+		proc.SetSysInfo()
 	}
-	// update cpu and memory
-	proc.SetSysInfo()
 
 	return proc.Status
 }

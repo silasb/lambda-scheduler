@@ -27,10 +27,12 @@ type Preparable struct {
 	Name       string
 	SourcePath string
 	Cmd        string
+	WorkingDir string
 	SysFolder  string
 	Language   string
 	KeepAlive  bool
 	Args       []string
+	Envs       []string
 }
 
 type BinaryPreparable struct {
@@ -38,9 +40,11 @@ type BinaryPreparable struct {
 	SourcePath string
 	Cmd        string
 	SysFolder  string
+	WorkingDir string
 	Language   string
 	KeepAlive  bool
 	Args       []string
+	Envs       []string
 }
 
 // PrepareBin will compile the Golang project from SourcePath and populate Cmd with the proper
@@ -140,15 +144,17 @@ func (preparable *BinaryPreparable) PrepareBin() ([]byte, error) {
 // Returns a tuple with the process and an error in case there's any.
 func (preparable *BinaryPreparable) Start() (process.ProcContainer, error) {
 	proc := &process.Proc{
-		Name:      preparable.Name,
-		Cmd:       preparable.Cmd,
-		Args:      preparable.Args,
-		Path:      preparable.getPath(),
-		Pidfile:   preparable.getPidPath(),
-		Outfile:   preparable.getOutPath(),
-		Errfile:   preparable.getErrPath(),
-		KeepAlive: preparable.KeepAlive,
-		Status:    &process.ProcStatus{},
+		Name:       preparable.Name,
+		Cmd:        preparable.Cmd,
+		Args:       preparable.Args,
+		Envs:       preparable.Envs,
+		WorkingDir: preparable.WorkingDir,
+		Path:       preparable.getPath(),
+		Pidfile:    preparable.getPidPath(),
+		Outfile:    preparable.getOutPath(),
+		Errfile:    preparable.getErrPath(),
+		KeepAlive:  preparable.KeepAlive,
+		Status:     &process.ProcStatus{},
 	}
 
 	err := proc.Start()

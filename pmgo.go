@@ -45,7 +45,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-
 var (
 	app     = kingpin.New("pmgo", "Aguia Process Manager.")
 	dns     = app.Flag("dns", "TCP Dns host.").Default(":9876").String()
@@ -65,6 +64,7 @@ var (
 	binFile         = start.Arg("binary", "compiled golang file").Bool()
 	startKeepAlive  = true
 	startArgs       = start.Flag("args", "External args.").Strings()
+	startEnvs       = start.Flag("envs", "External envs.").Strings()
 
 	restart     = app.Command("restart", "Restart a process.")
 	restartName = restart.Arg("name", "Process name.").Required().String()
@@ -101,7 +101,7 @@ func main() {
 	case start.FullCommand():
 		checkRemoteMasterServer()
 		cli := cli.InitCli(*dns, timeout)
-		cli.StartGoBin(*startSourcePath, *startName, startKeepAlive, *startArgs, *binFile)
+		cli.StartGoBin(*startSourcePath, *startName, startKeepAlive, *startArgs, *startEnvs, *binFile)
 		cli.Status()
 	case restart.FullCommand():
 		checkRemoteMasterServer()
@@ -167,10 +167,10 @@ func getCtx() *daemon.Context {
 
 // if RemoteMasterServer not running, just run
 func checkRemoteMasterServer() {
-	ctx := getCtx()
-	if ok, _, _ := isDaemonRunning(ctx); !ok {
-		startRemoteMasterServer()
-	}
+	//ctx := getCtx()
+	//if ok, _, _ := isDaemonRunning(ctx); !ok {
+	//startRemoteMasterServer()
+	//}
 }
 
 var waitedForSignal os.Signal
@@ -195,36 +195,36 @@ func kill(pid int, signal os.Signal) error {
 }
 
 func startRemoteMasterServer() {
-	var wg sync.WaitGroup
-	waitForChildSignal(&wg)
-	ctx := getCtx()
-	if ok, _, _ := isDaemonRunning(ctx); ok {
-		log.Info("pmgo daemon is already running.")
-		return
-	}
+	//var wg sync.WaitGroup
+	//waitForChildSignal(&wg)
+	getCtx()
+	//if ok, _, _ := isDaemonRunning(ctx); ok {
+	//log.Info("pmgo daemon is already running.")
+	//return
+	//}
 
-	d, err := ctx.Reborn()
-	if err != nil {
-		log.Fatalf("Failed to reborn daemon due to %+v.", err)
-	}
+	//d, err := ctx.Reborn()
+	//if err != nil {
+	//log.Fatalf("Failed to reborn daemon due to %+v.", err)
+	//}
 
-	if d != nil {
-		wg.Wait()
-		if waitedForSignal == syscall.SIGUSR1 {
-			log.Info("daemon started")
-			return
-		}
-	} else {
-		kill(os.Getpid(), syscall.SIGUSR1)
-		wg.Wait()
-		defer ctx.Release()
-	}
+	//if d != nil {
+	//wg.Wait()
+	//if waitedForSignal == syscall.SIGUSR1 {
+	//log.Info("daemon started")
+	//return
+	//}
+	//} else {
+	//kill(os.Getpid(), syscall.SIGUSR1)
+	//wg.Wait()
+	//defer ctx.Release()
+	//}
 
 	log.Info("Starting remote master server...")
 	remoteMaster := master.StartRemoteMasterServer(*dns, *serveConfigFile)
 
 	// send signal to parent's process to kill goroutine
-	kill(os.Getppid(), syscall.SIGUSR1)
+	//kill(os.Getppid(), syscall.SIGUSR1)
 	sigsKill := make(chan os.Signal, 1)
 	signal.Notify(sigsKill,
 		syscall.SIGINT,
@@ -233,11 +233,11 @@ func startRemoteMasterServer() {
 
 	<-sigsKill
 	log.Info("Received signal to stop...")
-	err = remoteMaster.Stop()
+	err := remoteMaster.Stop()
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(0)
+	//os.Exit(0)
 }
 
 func stopRemoteMasterServer() {
