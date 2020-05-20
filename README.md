@@ -29,6 +29,16 @@
 
 
 # PMGO 
+
+This is used as a POC for scheduling lambda functions to run.
+
+Changes:
+
+* supports running in foreground.
+* Running binaries from working director*y
+* Setting ENVs
+* ....
+
 PMGO is a lightweight process manager written in Golang for Golang applications. It helps you keep your applications alive forever, reload and start them from the source code.
 
 
