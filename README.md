@@ -39,9 +39,20 @@ PMGO is a lightweight process manager written in Golang for Golang applications.
 Changes:
 
 * supports running in foreground.
-* Running binaries from working director*y
+* Running binaries from working directory
 * Setting ENVs
+* Accepting remote commands to start with differnet ENVs
 * ....
+
+TODO:
+
+- [ ] Runtime timeouts
+  - 3 seconds by default then turns off function?
+- [ ] Change to definitions
+  - SetConfig instead of SetEnvs
+  - GetConfig instead of GetEnvs
+- [ ] Separate out Proc vs Config
+- [ ] Raft?
 
 Starting jobs with
 
