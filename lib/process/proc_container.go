@@ -23,6 +23,8 @@ type ProcContainer interface {
 	ShouldKeepAlive() bool
 	AddRestart()
 	NotifyStopped()
+	SetEnvs([]string)
+	GetEnvs() []string
 	SetStatus(status string)
 	SetUptime()
 	SetSysInfo()
@@ -84,6 +86,7 @@ func (proc *Proc) Start() error {
 		},
 	}
 	args := append([]string{proc.Name}, proc.Args...)
+	fmt.Println(proc.Cmd, args)
 	process, err := os.StartProcess(proc.Cmd, args, procAtr)
 	if err != nil {
 		log.Error(err)
@@ -224,6 +227,16 @@ func (proc *Proc) GetStatus() *ProcStatus {
 	}
 
 	return proc.Status
+}
+
+// SetEnvs
+func (proc *Proc) SetEnvs(envs []string) {
+	proc.Envs = envs
+}
+
+// GetEnvs
+func (proc *Proc) GetEnvs() []string {
+	return proc.Envs
 }
 
 // SetStatus will set proc status

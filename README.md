@@ -47,6 +47,8 @@ Starting jobs with
 
 ```
 ./pmgo start ../deno-aws-lambda-example/bootstrap deno3 true --envs LAMBDA_TASK_ROOT=$PWD/../deno-aws-lambda-example/ --envs _HANDLER=function.handler --envs AWS_LAMBDA_RUNTIME_API=127.0.0.1:8081 --envs PATH=/home/silas/.deno/bin:/usr/bin
+
+./pmgo start /home/silas/repos/deno-aws-lambda-example/bootstrap deno3 true --envs LAMBDA_TASK_ROOT=$PWD/../deno-aws-lambda-example/ --envs _HANDLER=function.handler --envs AWS_LAMBDA_RUNTIME_API=127.0.0.1:8081 --envs PATH=/home/silas/.deno/bin:/usr/bin
 ```
 
 ## Change log(2019-12-12 updated)

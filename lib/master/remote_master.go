@@ -28,6 +28,7 @@ type GoBin struct {
 	Args       []string // Args is an array containing all the extra args that will be passed to the binary after compilation.
 	Envs       []string
 	BinFile    bool
+	BZipFile   string
 }
 
 // ProcDataResponse is a struct than about proc attr
@@ -68,12 +69,38 @@ func (remote_master *RemoteMaster) StartGoBin(goBin *GoBin, ack *bool) error {
 	if goBin.BinFile {
 		isFromBinFile = true
 	}
-	preparable, output, err := remote_master.master.Prepare(goBin.SourcePath, goBin.Name, "go", goBin.KeepAlive, goBin.Args, goBin.Envs, isFromBinFile)
+	preparable, output, err := remote_master.master.Prepare(goBin.SourcePath, goBin.Name, "go", goBin.KeepAlive, goBin.Args, goBin.Envs, isFromBinFile, goBin.BZipFile)
 	*ack = true
 	if err != nil {
 		return fmt.Errorf("ERROR: %s OUTPUT: %s", err, string(output))
 	}
 	return remote_master.master.RunPreparable(preparable)
+}
+
+// PrepareGoZip will build a binary based on the arguments passed on goBin, then it will start the process
+// and keep it alive if KeepAlive is set to true.
+// It returns an error and binds true to ack pointer.
+func (remote_master *RemoteMaster) PrepareGoZip(goBin *GoBin, ack *bool) error {
+	log.Println("Received new PrepareGoZip")
+	isExist, err := remote_master.master.IsExistProc(goBin.Name)
+	if err != nil {
+		return err
+	}
+	// if current proc is exist just return
+	if isExist {
+		return nil
+	}
+
+	isFromBinFile := false
+	if goBin.BinFile {
+		isFromBinFile = true
+	}
+	preparable, output, err := remote_master.master.PrepareZip(goBin.Name, "go", goBin.KeepAlive, goBin.Args, goBin.Envs, isFromBinFile, goBin.BZipFile)
+	*ack = true
+	if err != nil {
+		return fmt.Errorf("ERROR: %s OUTPUT: %s", err, string(output))
+	}
+	return remote_master.master.SetupPreparable(preparable)
 }
 
 // RestartProcess will restart a process that was previously built using GoBin.
@@ -88,6 +115,13 @@ func (remote_master *RemoteMaster) RestartProcess(procName string, ack *bool) er
 func (remote_master *RemoteMaster) StartProcess(procName string, ack *bool) error {
 	*ack = true
 	return remote_master.master.StartProcess(procName)
+}
+
+// StartProcess will start a process that was previously built using GoBin.
+// It returns an error in case there's any.
+func (remote_master *RemoteMaster) StartProcessEnvs(goBin *GoBin, ack *bool) error {
+	*ack = true
+	return remote_master.master.StartProcessEnvs(goBin.Name, goBin.Envs)
 }
 
 // StopProcess will stop a process that is currently running.
@@ -232,4 +266,31 @@ func (client RemoteClient) GetProcByName(procName string) *map[string]string {
 	var response map[string]string
 	client.conn.Call("RemoteMaster.GetProcByName", procName, &response)
 	return &response
+}
+
+// PrepareGoZip will return proc info by name
+func (client *RemoteClient) PrepareGoZip(name string, keepAlive bool, args []string, envs []string, binFile bool, bZipFile string) error {
+	var started bool
+	goBin := &GoBin{
+		Name:      name,
+		KeepAlive: keepAlive,
+		Args:      args,
+		Envs:      envs,
+		BinFile:   binFile,
+		BZipFile:  bZipFile,
+	}
+
+	return client.conn.Call("RemoteMaster.PrepareGoZip", goBin, &started)
+}
+
+// StartProcessEnvs
+func (client *RemoteClient) StartProcessEnvs(procName string, envs []string) error {
+	var started bool
+
+	goBin := &GoBin{
+		Name: procName,
+		Envs: envs,
+	}
+
+	return client.conn.Call("RemoteMaster.StartProcessEnvs", goBin, &started)
 }

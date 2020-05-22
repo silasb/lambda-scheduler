@@ -1,13 +1,16 @@
 package preparable
 
 import (
-	"fmt"
+	"encoding/base64"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/struCoder/pmgo/lib/process"
+	"github.com/struCoder/pmgo/lib/utils"
 )
 
 // ProcPreparable is a preparable with all the necessary informations to run
@@ -15,6 +18,7 @@ import (
 type ProcPreparable interface {
 	PrepareBin() ([]byte, error)
 	Start() (process.ProcContainer, error)
+	SetupProc() (process.ProcContainer, error)
 	getPath() string
 	Identifier() string
 	getBinPath() string
@@ -39,6 +43,7 @@ type BinaryPreparable struct {
 	Name       string
 	SourcePath string
 	Cmd        string
+	BZipFile   string
 	SysFolder  string
 	WorkingDir string
 	Language   string
@@ -89,6 +94,23 @@ func (preparable *Preparable) Start() (process.ProcContainer, error) {
 	return proc, err
 }
 
+func (preparable *Preparable) SetupProc() (process.ProcContainer, error) {
+	proc := &process.Proc{
+		Name:      preparable.Name,
+		Cmd:       preparable.Cmd,
+		Args:      preparable.Args,
+		Path:      preparable.getPath(),
+		Pidfile:   preparable.getPidPath(),
+		Outfile:   preparable.getOutPath(),
+		Errfile:   preparable.getErrPath(),
+		KeepAlive: preparable.KeepAlive,
+		Status:    &process.ProcStatus{},
+	}
+
+	// err := proc.Start()
+	return proc, nil
+}
+
 // Identifier is a function that get proc name
 func (preparable *Preparable) Identifier() string {
 	return preparable.Name
@@ -122,19 +144,43 @@ func (preparable *Preparable) getErrPath() string {
 // PrepareBin checks if the given binary path is a valid executable.
 // Returns no bytes, but if there is an error, it will be returned.
 func (preparable *BinaryPreparable) PrepareBin() ([]byte, error) {
-	info, err := os.Stat(preparable.SourcePath)
+	// build directory
+	err := os.MkdirAll(filepath.Dir(preparable.getOutPath()), 0755)
 	if err != nil {
 		return make([]byte, 0), err
-	}
-	if info.Mode()&0111 == 0 {
-		return make([]byte, 0), fmt.Errorf("The given source path(%s) is not executable, neither a Go source to compile", preparable.SourcePath)
 	}
 
-	err = os.MkdirAll(filepath.Dir(preparable.getOutPath()), 0755)
+	runtimePath := preparable.getPath() + "/runtime"
+
+	err = os.MkdirAll(runtimePath, 0755)
 	if err != nil {
 		return make([]byte, 0), err
 	}
-	preparable.Cmd = preparable.SourcePath
+
+	preparable.Envs = append(preparable.Envs, "LAMBDA_TASK_ROOT="+runtimePath, "PATH=/home/silas/.deno/bin:/usr/bin")
+
+	// unzip file
+	decoded, err := base64.StdEncoding.DecodeString(preparable.BZipFile)
+	if err != nil {
+		log.Printf("decode error:", err)
+		return make([]byte, 0), err
+	}
+
+	zipPath := preparable.getPath() + "/function.zip"
+
+	err = ioutil.WriteFile(zipPath, []byte(decoded), 0644)
+	if err != nil {
+		log.Printf("decode error:", err)
+		return make([]byte, 0), err
+	}
+
+	err = utils.Unzip(zipPath, runtimePath)
+	if err != nil {
+		log.Printf("error unzipping file: %s at path %s", err, runtimePath)
+	}
+
+	// set command
+	preparable.Cmd = preparable.getPath() + "/runtime/bootstrap"
 	return make([]byte, 0), err
 }
 
@@ -148,7 +194,7 @@ func (preparable *BinaryPreparable) Start() (process.ProcContainer, error) {
 		Cmd:        preparable.Cmd,
 		Args:       preparable.Args,
 		Envs:       preparable.Envs,
-		WorkingDir: preparable.WorkingDir,
+		WorkingDir: preparable.getPath(),
 		Path:       preparable.getPath(),
 		Pidfile:    preparable.getPidPath(),
 		Outfile:    preparable.getOutPath(),
@@ -159,6 +205,29 @@ func (preparable *BinaryPreparable) Start() (process.ProcContainer, error) {
 
 	err := proc.Start()
 	return proc, err
+}
+
+// Start will execute the process based on the information presented on the preparable.
+// This function should be called from inside the master to make sure
+// all the watchers and process handling are done correctly.
+// Returns a tuple with the process and an error in case there's any.
+func (preparable *BinaryPreparable) SetupProc() (process.ProcContainer, error) {
+	proc := &process.Proc{
+		Name:       preparable.Name,
+		Cmd:        preparable.Cmd,
+		Args:       preparable.Args,
+		Envs:       preparable.Envs,
+		WorkingDir: preparable.getPath(),
+		Path:       preparable.getPath(),
+		Pidfile:    preparable.getPidPath(),
+		Outfile:    preparable.getOutPath(),
+		Errfile:    preparable.getErrPath(),
+		KeepAlive:  preparable.KeepAlive,
+		Status:     &process.ProcStatus{},
+		Pid:        -1,
+	}
+
+	return proc, nil
 }
 
 // Identifier is a function that get proc name

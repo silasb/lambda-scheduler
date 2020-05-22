@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 
 	"time"
@@ -114,6 +115,7 @@ func (master *Master) ProcInfo(proName string) map[string]string {
 		procDetailInfo["errorFile"] = proc.GetErrFile()
 		procDetailInfo["path"] = proc.GetPath()
 		procDetailInfo["name"] = proc.GetName()
+		procDetailInfo["ENVs"] = strings.Join(proc.GetEnvs(), ",")
 		procDetailInfo["uptime"] = procStatus.Uptime
 		procDetailInfo["status"] = procStatus.Status
 		procDetailInfo["restart"] = fmt.Sprintf("%d", procStatus.Restarts)
@@ -147,13 +149,14 @@ func (master *Master) WatchProcs() {
 
 // Prepare will compile the source code into a binary and return a preparable
 // ready to be executed.
-func (master *Master) Prepare(sourcePath string, name string, language string, keepAlive bool, args []string, envs []string, fromBin bool) (preparable.ProcPreparable, []byte, error) {
+func (master *Master) Prepare(sourcePath string, name string, language string, keepAlive bool, args []string, envs []string, fromBin bool, bZipFile string) (preparable.ProcPreparable, []byte, error) {
 	var procPreparable preparable.ProcPreparable
 	if fromBin {
 		procPreparable = &preparable.BinaryPreparable{
 			Name:       name,
 			SourcePath: sourcePath,
 			SysFolder:  master.SysFolder,
+			BZipFile:   bZipFile,
 			Language:   language,
 			KeepAlive:  keepAlive,
 			Args:       args,
@@ -168,6 +171,26 @@ func (master *Master) Prepare(sourcePath string, name string, language string, k
 			KeepAlive:  keepAlive,
 			Args:       args,
 			Envs:       envs,
+		}
+	}
+
+	output, err := procPreparable.PrepareBin()
+	return procPreparable, output, err
+}
+
+// Prepare will compile the source code into a binary and return a preparable
+// ready to be executed.
+func (master *Master) PrepareZip(name string, language string, keepAlive bool, args []string, envs []string, fromBin bool, bZipFile string) (preparable.ProcPreparable, []byte, error) {
+	var procPreparable preparable.ProcPreparable
+	if fromBin {
+		procPreparable = &preparable.BinaryPreparable{
+			Name:      name,
+			SysFolder: master.SysFolder,
+			BZipFile:  bZipFile,
+			Language:  language,
+			KeepAlive: keepAlive,
+			Args:      args,
+			Envs:      envs,
 		}
 	}
 
@@ -191,6 +214,25 @@ func (master *Master) RunPreparable(procPreparable preparable.ProcPreparable) er
 	master.saveProcsWrapper()
 	master.Watcher.AddProcWatcher(proc)
 	proc.SetStatus("running")
+	return nil
+}
+
+// SetupPreparable will run procPreparable and add it to the watch list in case everything goes well.
+func (master *Master) SetupPreparable(procPreparable preparable.ProcPreparable) error {
+	master.Lock()
+	defer master.Unlock()
+	if _, ok := master.Procs[procPreparable.Identifier()]; ok {
+		log.Warnf("Proc %s already exist.", procPreparable.Identifier())
+		return errors.New("Trying to start a process that already exist.")
+	}
+	proc, err := procPreparable.SetupProc()
+	if err != nil {
+		return err
+	}
+	master.Procs[proc.Identifier()] = proc
+	master.saveProcsWrapper()
+	proc.SetStatus("stopped")
+	log.Println("Finished setting up lambda")
 	return nil
 }
 
@@ -221,6 +263,44 @@ func (master *Master) StartProcess(name string) error {
 	defer master.Unlock()
 	if proc, ok := master.Procs[name]; ok {
 		return master.start(proc)
+	}
+	return errors.New("Unknown process.")
+}
+
+// StartProcessEnvs will a start a process with customized Envs merged in with existing envs
+func (master *Master) StartProcessEnvs(name string, envs []string) error {
+	master.Lock()
+	defer master.Unlock()
+	if proc, ok := master.Procs[name]; ok {
+		curEnvs := proc.GetEnvs()
+		varnewEnvs := make(map[string]string, len(curEnvs))
+		for _, env := range curEnvs {
+			split := strings.Split(env, "=")
+			if len(split) == 2 {
+				varnewEnvs[split[0]] = split[1]
+			}
+		}
+
+		for _, env := range envs {
+			split := strings.Split(env, "=")
+			if len(split) == 2 {
+				varnewEnvs[split[0]] = split[1]
+			}
+		}
+
+		newEnvs := make([]string, len(varnewEnvs))
+		i := 0
+		for k, v := range varnewEnvs {
+			newEnvs[i] = fmt.Sprintf("%s=%s", k, v)
+			i++
+		}
+
+		proc.SetEnvs(newEnvs)
+		if proc.IsAlive() {
+			return master.restart(proc)
+		} else {
+			return master.start(proc)
+		}
 	}
 	return errors.New("Unknown process.")
 }
