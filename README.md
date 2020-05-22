@@ -52,6 +52,7 @@ TODO:
   - SetConfig instead of SetEnvs
   - GetConfig instead of GetEnvs
 - [ ] Separate out Proc vs Config
+- [ ] Support scaling replicas out
 - [ ] Raft?
 
 Starting jobs with
