@@ -46,6 +46,7 @@ Changes:
 
 TODO:
 
+- [ ] Starting functions on-demand
 - [ ] Runtime timeouts
   - 3 seconds by default then turns off function?
 - [ ] Change to definitions
@@ -54,6 +55,12 @@ TODO:
 - [ ] Separate out Proc vs Config
 - [ ] Support scaling replicas out
 - [ ] Raft?
+
+Starting server with
+
+```
+fd .go | entr -c -r go run pmgo.go serve
+```
 
 Starting jobs with
 
