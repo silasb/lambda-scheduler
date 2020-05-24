@@ -37,6 +37,7 @@ type Preparable struct {
 	KeepAlive  bool
 	Args       []string
 	Envs       []string
+	Timeout    int
 }
 
 type BinaryPreparable struct {
@@ -50,6 +51,7 @@ type BinaryPreparable struct {
 	KeepAlive  bool
 	Args       []string
 	Envs       []string
+	Timeout    int
 }
 
 // PrepareBin will compile the Golang project from SourcePath and populate Cmd with the proper
@@ -200,6 +202,7 @@ func (preparable *BinaryPreparable) Start() (process.ProcContainer, error) {
 		Outfile:    preparable.getOutPath(),
 		Errfile:    preparable.getErrPath(),
 		KeepAlive:  preparable.KeepAlive,
+		Timeout:    preparable.Timeout,
 		Status:     &process.ProcStatus{},
 	}
 
@@ -223,6 +226,7 @@ func (preparable *BinaryPreparable) SetupProc() (process.ProcContainer, error) {
 		Outfile:    preparable.getOutPath(),
 		Errfile:    preparable.getErrPath(),
 		KeepAlive:  preparable.KeepAlive,
+		Timeout:    preparable.Timeout,
 		Status:     &process.ProcStatus{},
 		Pid:        -1,
 	}

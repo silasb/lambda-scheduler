@@ -139,7 +139,7 @@ func (master *Master) WatchProcs() {
 			log.Warnf("Proc %s was supposed to be dead, but it is alive.", proc.Identifier())
 		}
 		master.Lock()
-		err := master.restart(proc)
+		err := master.restart(proc, false)
 		master.Unlock()
 		if err != nil {
 			log.Warnf("Could not restart process %s due to %s.", proc.Identifier(), err)
@@ -180,7 +180,7 @@ func (master *Master) Prepare(sourcePath string, name string, language string, k
 
 // Prepare will compile the source code into a binary and return a preparable
 // ready to be executed.
-func (master *Master) PrepareZip(name string, language string, keepAlive bool, args []string, envs []string, fromBin bool, bZipFile string) (preparable.ProcPreparable, []byte, error) {
+func (master *Master) PrepareZip(name string, language string, keepAlive bool, args []string, envs []string, fromBin bool, bZipFile string, timeout int) (preparable.ProcPreparable, []byte, error) {
 	var procPreparable preparable.ProcPreparable
 	if fromBin {
 		procPreparable = &preparable.BinaryPreparable{
@@ -191,6 +191,7 @@ func (master *Master) PrepareZip(name string, language string, keepAlive bool, a
 			KeepAlive: keepAlive,
 			Args:      args,
 			Envs:      envs,
+			Timeout:   timeout,
 		}
 	}
 
@@ -246,10 +247,10 @@ func (master *Master) ListProcs() []process.ProcContainer {
 }
 
 // RestartProcess will restart a process.
-func (master *Master) RestartProcess(name string) error {
+func (master *Master) RestartProcess(name string, force bool) error {
 	if proc, ok := master.Procs[name]; ok {
 		master.Lock()
-		err := master.restart(proc)
+		err := master.restart(proc, force)
 		master.Unlock()
 		return err
 	}
@@ -297,7 +298,7 @@ func (master *Master) StartProcessEnvs(name string, envs []string) error {
 
 		proc.SetEnvs(newEnvs)
 		if proc.IsAlive() {
-			return master.restart(proc)
+			return master.restart(proc, false)
 		} else {
 			return master.start(proc)
 		}
@@ -306,11 +307,11 @@ func (master *Master) StartProcessEnvs(name string, envs []string) error {
 }
 
 // StopProcess will stop a process with the given name.
-func (master *Master) StopProcess(name string) error {
+func (master *Master) StopProcess(name string, force bool) error {
 	master.Lock()
 	defer master.Unlock()
 	if proc, ok := master.Procs[name]; ok {
-		return master.stop(proc)
+		return master.stop(proc, force)
 	}
 	return errors.New("Unknown process.")
 }
@@ -321,7 +322,7 @@ func (master *Master) DeleteProcess(name string) error {
 	defer master.Unlock()
 	log.Infof("Trying to delete proc %s", name)
 	if proc, ok := master.Procs[name]; ok {
-		err := master.stop(proc)
+		err := master.stop(proc, false)
 		if err != nil {
 			return err
 		}
@@ -377,10 +378,15 @@ func (master *Master) delete(proc process.ProcContainer) error {
 }
 
 // NOT thread safe method. Lock should be acquire before calling it.
-func (master *Master) stop(proc process.ProcContainer) error {
+func (master *Master) stop(proc process.ProcContainer, force bool) error {
 	if proc.IsAlive() {
 		waitStop := master.Watcher.StopWatcher(proc.Identifier())
-		err := proc.GracefullyStop()
+		var err error
+		if force {
+			err = proc.ForceStop()
+		} else {
+			err = proc.GracefullyStop()
+		}
 		if err != nil {
 			return err
 		}
@@ -420,10 +426,10 @@ func (master *Master) updateStatus(proc process.ProcContainer) {
 }
 
 // NOT thread safe method. Lock should be acquire before calling it.
-func (master *Master) restart(proc process.ProcContainer) error {
+func (master *Master) restart(proc process.ProcContainer, force bool) error {
 	// restat count +1
 	proc.AddRestart()
-	err := master.stop(proc)
+	err := master.stop(proc, force)
 	if err != nil {
 		return err
 	}
@@ -450,7 +456,7 @@ func (master *Master) Stop() error {
 	for id := range procs {
 		proc := procs[id]
 		log.Info("Stopping proc %s", proc.Identifier())
-		master.stop(proc)
+		master.stop(proc, false)
 	}
 	log.Info("Saving and returning list of procs.")
 	return master.saveProcsWrapper()
@@ -478,7 +484,7 @@ func (master *Master) getConfigPath() string {
 func (master *Master) IsExistProc(procName string) (bool, error) {
 	if proc, ok := master.Procs[procName]; ok {
 		if !proc.IsAlive() {
-			err := master.RestartProcess(procName)
+			err := master.RestartProcess(procName, false)
 			if err != nil {
 				return false, err
 			}

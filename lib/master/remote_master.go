@@ -29,13 +29,15 @@ type GoBin struct {
 	Envs       []string
 	BinFile    bool
 	BZipFile   string
+	Timeout    int
 }
 
 // ProcDataResponse is a struct than about proc attr
 type ProcDataResponse struct {
-	Name   string
-	Pid    int
-	Status *process.ProcStatus
+	Name    string
+	Pid     int
+	Status  *process.ProcStatus
+	Timeout int
 	// KeepAlive bool
 }
 
@@ -95,7 +97,7 @@ func (remote_master *RemoteMaster) PrepareGoZip(goBin *GoBin, ack *bool) error {
 	if goBin.BinFile {
 		isFromBinFile = true
 	}
-	preparable, output, err := remote_master.master.PrepareZip(goBin.Name, "go", goBin.KeepAlive, goBin.Args, goBin.Envs, isFromBinFile, goBin.BZipFile)
+	preparable, output, err := remote_master.master.PrepareZip(goBin.Name, "go", goBin.KeepAlive, goBin.Args, goBin.Envs, isFromBinFile, goBin.BZipFile, goBin.Timeout)
 	*ack = true
 	if err != nil {
 		return fmt.Errorf("ERROR: %s OUTPUT: %s", err, string(output))
@@ -107,7 +109,14 @@ func (remote_master *RemoteMaster) PrepareGoZip(goBin *GoBin, ack *bool) error {
 // It returns an error in case there's any.
 func (remote_master *RemoteMaster) RestartProcess(procName string, ack *bool) error {
 	*ack = true
-	return remote_master.master.RestartProcess(procName)
+	return remote_master.master.RestartProcess(procName, false)
+}
+
+// ForceRestartProcess will restart a process that was previously built using GoBin.
+// It returns an error in case there's any.
+func (remote_master *RemoteMaster) ForceRestartProcess(procName string, ack *bool) error {
+	*ack = true
+	return remote_master.master.RestartProcess(procName, true)
 }
 
 // StartProcess will start a process that was previously built using GoBin.
@@ -128,7 +137,14 @@ func (remote_master *RemoteMaster) StartProcessEnvs(goBin *GoBin, ack *bool) err
 // It returns an error in case there's any.
 func (remote_master *RemoteMaster) StopProcess(procName string, ack *bool) error {
 	*ack = true
-	return remote_master.master.StopProcess(procName)
+	return remote_master.master.StopProcess(procName, false)
+}
+
+// ForceStopProcess will stop a process that is currently running.
+// It returns an error in case there's any.
+func (remote_master *RemoteMaster) ForceStopProcess(procName string, ack *bool) error {
+	*ack = true
+	return remote_master.master.StopProcess(procName, true)
 }
 
 // MonitStatus will query for the status of each process and bind it to procs pointer list.
@@ -141,9 +157,10 @@ func (remote_master *RemoteMaster) MonitStatus(req string, response *ProcRespons
 		for id := range procs {
 			proc := procs[id]
 			procData := &ProcDataResponse{
-				Name:   proc.Identifier(),
-				Pid:    proc.GetPid(),
-				Status: proc.GetStatus(),
+				Name:    proc.Identifier(),
+				Pid:     proc.GetPid(),
+				Status:  proc.GetStatus(),
+				Timeout: proc.GetTimeout(),
 				// KeepAlive: proc.ShouldKeepAlive(),
 			}
 			procsResponse = append(procsResponse, procData)
@@ -232,6 +249,13 @@ func (client *RemoteClient) RestartProcess(procName string) error {
 	return client.conn.Call("RemoteMaster.RestartProcess", procName, &started)
 }
 
+// ForceRestartProcess is a wrapper that calls the remote RestartProcess.
+// It returns an error in case there's any.
+func (client *RemoteClient) ForceRestartProcess(procName string) error {
+	var started bool
+	return client.conn.Call("RemoteMaster.ForceRestartProcess", procName, &started)
+}
+
 // StartProcess is a wrapper that calls the remote StartProcess.
 // It returns an error in case there's any.
 func (client *RemoteClient) StartProcess(procName string) error {
@@ -269,7 +293,7 @@ func (client RemoteClient) GetProcByName(procName string) *map[string]string {
 }
 
 // PrepareGoZip will return proc info by name
-func (client *RemoteClient) PrepareGoZip(name string, keepAlive bool, args []string, envs []string, binFile bool, bZipFile string) error {
+func (client *RemoteClient) PrepareGoZip(name string, keepAlive bool, args []string, envs []string, binFile bool, bZipFile string, timeout int) error {
 	var started bool
 	goBin := &GoBin{
 		Name:      name,
@@ -278,6 +302,7 @@ func (client *RemoteClient) PrepareGoZip(name string, keepAlive bool, args []str
 		Envs:      envs,
 		BinFile:   binFile,
 		BZipFile:  bZipFile,
+		Timeout:   timeout,
 	}
 
 	return client.conn.Call("RemoteMaster.PrepareGoZip", goBin, &started)

@@ -37,6 +37,7 @@ type ProcContainer interface {
 	GetPath() string
 	GetErrFile() string
 	GetName() string
+	GetTimeout() int
 }
 
 // Proc is a os.Process wrapper with Status and more info that will be used on Master to maintain
@@ -52,6 +53,7 @@ type Proc struct {
 	Outfile    string
 	Errfile    string
 	KeepAlive  bool
+	Timeout    int
 	Pid        int
 	Status     *ProcStatus
 	process    *os.Process
@@ -272,4 +274,9 @@ func (proc *Proc) ShouldKeepAlive() bool {
 // GetName will return current proc name
 func (proc *Proc) GetName() string {
 	return proc.Name
+}
+
+// GetTimeout
+func (proc *Proc) GetTimeout() int {
+	return proc.Timeout
 }
